@@ -302,36 +302,35 @@ ELASTICSEARCH = {
     'TIMEOUT': int(os.environ.get('ELASTICSEARCH_TIMEOUT', '45')),
     'INDEX_VERSIONS': split(os.environ.get('ELASTICSEARCH_INDEX_VERSIONS', ''), ','),
     'CHUNK_SIZE': int(os.environ.get('ELASTICSEARCH_CHUNK_SIZE', 25)),
-    'DEFAULT_FETCHERS': {
-        'agent': 'share.search.fetchers.AgentFetcher',
-        'creativework': 'share.search.fetchers.CreativeWorkFetcher',
-        'subject': 'share.search.fetchers.SubjectFetcher',
-        'tag': 'share.search.fetchers.TagFetcher',
-    },
-    'QUEUE_SETTINGS': {
+    'KOMBU_QUEUE_SETTINGS': {
         'serializer': 'json',
         'compression': 'zlib',
         'no_ack': False,  # WHY KOMBU THAT'S NOT HOW ENGLISH WORKS
     },
     # NOTE: mappings will have to be created BEFORE the daemon starts
-    'ACTIVE_INDEXES': split(os.environ.get('ELASTICSEARCH_ACTIVE_INDEXES', 'share_customtax_1'), ','),
+    'ACTIVE_INDEXES': split(os.environ.get('ELASTICSEARCH_ACTIVE_INDEXES', 'share_customtax_1,share_v3'), ','),
     'INDEXES': {
         'share_v3': {
             'DEFAULT_QUEUE': 'es-triton-share',
             'URGENT_QUEUE': 'es-triton-share.urgent',
+            'INDEX_SETUP': 'share_classic',
         },
         'share_customtax_1': {
             'DEFAULT_QUEUE': 'es-share',
             'URGENT_QUEUE': 'es-share.urgent',
-        }
+            'INDEX_SETUP': 'share_classic',
+        },
+        # 'share_v5': {
+        #     'DEFAULT_QUEUE': 'es-share-v5',
+        #     'URGENT_QUEUE': 'es-share-v5.urgent',
+        #     'INDEX_SETUP': 'postrend_backcompat',
+        # },
+        # 'share_v6': {
+        #     'DEFAULT_QUEUE': 'es-share-v5',
+        #     'URGENT_QUEUE': 'es-share-v5.urgent',
+        #     'INDEX_SETUP': 'trove_v0',
+        # },
     },
-}
-
-INDEXABLE_MODELS = {
-    'agent': 'Agent',
-    'creativework': 'CreativeWork',
-    'subject': 'Subject',
-    'tag': 'Tag',
 }
 
 # Seconds, not an actual celery settings
@@ -543,7 +542,7 @@ SHARE_LIMITS = {
     'MAX_AGENT_RELATIONS': 500,
 }
 
-OSF_API_URL = os.environ.get('OSF_API_URL', 'https://api.osf.io').rstrip('/') + '/'
+OSF_API_URL = os.environ.get('OSF_API_URL', 'http://localhost:8000').rstrip('/') + '/'
 OSF_BYPASS_THROTTLE_TOKEN = os.environ.get('BYPASS_THROTTLE_TOKEN', None)
 
 DOI_BASE_URL = os.environ.get('DOI_BASE_URL', 'http://dx.doi.org/')
