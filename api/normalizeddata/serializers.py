@@ -12,9 +12,12 @@ class FullNormalizedDataSerializer(serializers.ModelSerializer):
     tasks = serializers.PrimaryKeyRelatedField(many=True, read_only=False, queryset=models.CeleryTaskResult.objects.all())
     source = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
+    # TODO make suid required
+    suid = serializers.CharField(write_only=True, required=False)
+
     class Meta:
         model = models.NormalizedData
-        fields = ('data', 'source', 'raw', 'tasks', 'url')
+        fields = ('data', 'source', 'raw', 'tasks', 'url', 'suid')
 
 
 class BasicNormalizedDataSerializer(serializers.ModelSerializer):
@@ -23,6 +26,9 @@ class BasicNormalizedDataSerializer(serializers.ModelSerializer):
 
     source = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
+    # TODO make suid required
+    suid = serializers.CharField(write_only=True, required=False)
+
     class Meta:
         model = models.NormalizedData
-        fields = ('data', 'source', 'url')
+        fields = ('data', 'source', 'url', 'suid')
