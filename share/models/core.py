@@ -13,6 +13,8 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
+from model_utils import Choices
+
 from oauth2_provider.models import AccessToken, Application
 
 from osf_oauth2_adapter.apps import OsfOauth2AdapterConfig
@@ -199,3 +201,26 @@ class NormalizedData(models.Model):
         return '<{}({}, {}, {})>'.format(self.__class__.__name__, self.id, self.source.get_short_name(), self.created_at)
 
     __repr__ = __str__
+
+
+class CachedElasticDoc(models.Model):
+    DOC_FORMAT = Choices(
+        ('BC', _('Back-compatible')),  # same as used to be build from the ShareObject family
+        ('TR', _('Trove-style')),
+    )
+
+    id = models.AutoField(primary_key=True)
+
+    suid = models.ForeignKey('SourceUniqueIdentifier', on_delete=models.CASCADE)
+    doc_format = models.CharField(max_length=2, choices=DOC_FORMAT)
+
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_modified = models.DateTimeField(auto_now=True)
+
+    elastic_doc = DateTimeAwareJSONField()  # TODO validator?
+
+    class Meta:
+        unique_together = ('suid', 'doc_format')
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}({self.id}, {self.suid_id}, {self.doc_format})>'

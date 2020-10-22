@@ -21,7 +21,9 @@ from share.models import (
 from share.models.ingest import RawDatumJob
 from share.regulate import Regulator
 from share.search import SearchIndexer
+from share.search.messages import MessageType
 from share.util import chunked
+from share.util.extensions import Extensions
 from share.util.graph import MutableGraph
 
 
@@ -328,9 +330,15 @@ class IngestJobConsumer(JobConsumer):
             graph = MutableGraph.from_jsonld(datum.data)
 
         if apply_changes:
+            # soon-to-be-rended ShareObject-based process:
             updated_work_ids = self._apply_changes(job, graph, datum)
             if index and updated_work_ids:
                 self._update_index(updated_work_ids, urgent)
+
+        if index:
+            # new Suid-based process
+            self._cache_elastic_docs(job.suid, datum)
+            self._queue_for_indexing(job.suid, urgent)
 
     def _transform(self, job):
         transformer = job.suid.source_config.get_transformer()
@@ -357,6 +365,20 @@ class IngestJobConsumer(JobConsumer):
         except exceptions.RegulateError as e:
             job.fail(e)
             return None
+
+    def _cache_elastic_docs(self, suid, normalized_datum):
+        index_setup_names = {
+            index_settings['INDEX_SETUP']
+            for index_settings in settings.ELASTICSEARCH['INDEXES'].values()
+        }
+        for index_setup_name in index_setup_names:
+            index_setup = Extensions.get('share.search.index_setup', index_setup_name)()
+            if MessageType.INDEX_SUID in index_setup.supported_message_types:
+                index_setup.build_and_cache_source_doc(MessageType.INDEX_SUID, suid.id)
+
+    def _queue_for_indexing(self, suid, urgent):
+        indexer = SearchIndexer(self.task.app) if self.task else SearchIndexer()
+        indexer.send_messages(MessageType.INDEX_SUID, [suid.id], urgent=urgent)
 
     def _apply_changes(self, job, graph, normalized_datum):
         updated = None
