@@ -1,6 +1,10 @@
 from stevedore import extension
 
 
+class ExtensionsError(Exception):
+    pass
+
+
 class Extensions:
     """Lazy singleton container for stevedore extensions.
 
@@ -14,13 +18,19 @@ class Extensions:
 
     @classmethod
     def get(cls, namespace, name):
-        manager = cls._managers.get(namespace)
-        if manager is None:
-            manager = cls._load_namespace(namespace)
-        return manager[name].plugin
+        try:
+            manager = cls._managers.get(namespace)
+            if manager is None:
+                manager = cls._load_namespace(namespace)
+            return manager[name].plugin
+        except Exception as exc:
+            raise ExtensionsError(f'Error loading extension ("{namespace}", "{name}")') from exc
 
     @classmethod
     def _load_namespace(cls, namespace):
-        manager = extension.ExtensionManager(namespace)
-        cls._managers[namespace] = manager
-        return manager
+        try:
+            manager = extension.ExtensionManager(namespace)
+            cls._managers[namespace] = manager
+            return manager
+        except Exception as exc:
+            raise ExtensionsError(f'Error loading extension namespace "{namespace}"') from exc
