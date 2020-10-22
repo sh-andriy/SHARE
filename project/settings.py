@@ -320,11 +320,11 @@ ELASTICSEARCH = {
             'URGENT_QUEUE': 'es-share.urgent',
             'INDEX_SETUP': 'share_classic',
         },
-        # 'share_v5': {
-        #     'DEFAULT_QUEUE': 'es-share-v5',
-        #     'URGENT_QUEUE': 'es-share-v5.urgent',
-        #     'INDEX_SETUP': 'postrend_backcompat',
-        # },
+        'share_v5': {
+            'DEFAULT_QUEUE': 'es-share-v5',
+            'URGENT_QUEUE': 'es-share-v5.urgent',
+            'INDEX_SETUP': 'postrend_backcompat',
+        },
         # 'share_v6': {
         #     'DEFAULT_QUEUE': 'es-share-v5',
         #     'URGENT_QUEUE': 'es-share-v5.urgent',
