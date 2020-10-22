@@ -23,70 +23,80 @@ logger = logging.getLogger(__name__)
 LOOP_TIMEOUT = 5
 
 
-class SearchIndexerDaemon(ConsumerMixin):
-
-    MAX_LOCAL_QUEUE_SIZE = 5000
+class CeleryMessageConsumer(ConsumerMixin):
     PREFETCH_COUNT = 7500
 
-    @classmethod
-    def start_indexer_in_thread(cls, celery_app, stop_event, elastic_manager, index_name):
-        indexer = cls(
-            celery_connection=celery_app.pool.acquire(block=True),
-            index_name=index_name,
-            index_setup=elastic_manager.get_index_setup(index_name),
-            stop_event=stop_event,
-        )
-
-        threading.Thread(target=indexer.run).start()
-
-        return indexer
-
-    def __init__(self, celery_connection, index_name, index_setup, stop_event):
-        self.connection = celery_connection  # needed by ConsumerMixin
-
-        self.__stop_event = stop_event
-        self.__index_name = index_name
-        self.__index_setup = index_setup
-
-        self.__thread_pool = None
-        self.__incoming_message_queues = {}
-        self.__outgoing_action_queue = None
+    def __init__(self, celery_app, indexer_daemon):
+        self.connection = celery_app.pool.acquire(block=True)
+        self.celery_app = celery_app
+        self.__indexer_daemon = indexer_daemon
 
     # overrides ConsumerMixin.run
     def run(self):
-        try:
-            logger.info('%r: Starting', self)
+        logger.info('%r: Starting', self)
 
-            self.__start_loops_and_queues()
+        threading.Thread(target=self.__wait_for_stop).start()
 
-            logger.debug('%r: Delegating to Kombu.run', self)
-            return super().run()
-        finally:
-            self.stop()
+        logger.debug('%r: Delegating to Kombu.run', self)
+        return super().run()
 
-    # for ConsumerMixin -- specifies rabbit queues to consume, registers __on_message callback
+    def __wait_for_stop(self):
+        while not (self.should_stop or self.__indexer_daemon.stop_event.is_set()):
+            self.__indexer_daemon.stop_event.wait(timeout=LOOP_TIMEOUT)
+        logger.warning('%r: Stopping', self)
+        self.should_stop = True
+        self.__indexer_daemon.stop_event.set()
+
+    # for ConsumerMixin -- specifies rabbit queues to consume, registers on_message callback
     def get_consumers(self, Consumer, channel):
         kombu_queue_settings = settings.ELASTICSEARCH['KOMBU_QUEUE_SETTINGS']
-        index_settings = settings.ELASTICSEARCH['INDEXES'][self.__index_name]
+        index_settings = settings.ELASTICSEARCH['INDEXES'][self.__indexer_daemon.index_name]
         return [
             Consumer(
                 [
                     KombuQueue(index_settings['URGENT_QUEUE'], **kombu_queue_settings),
                     KombuQueue(index_settings['DEFAULT_QUEUE'], **kombu_queue_settings),
                 ],
-                callbacks=[self.__on_message],
+                callbacks=[self.__indexer_daemon.on_message],
                 accept=['json'],
                 prefetch_count=self.PREFETCH_COUNT,
             )
         ]
 
+    def __repr__(self):
+        return '<{}({})>'.format(self.__class__.__name__, self.__indexer_daemon.index_name)
+
+
+class SearchIndexerDaemon:
+
+    MAX_LOCAL_QUEUE_SIZE = 5000
+
+    @classmethod
+    def start_indexer_in_thread(cls, celery_app, stop_event, elastic_manager, index_name):
+        indexer_daemon = cls(
+            index_name=index_name,
+            index_setup=elastic_manager.get_index_setup(index_name),
+            stop_event=stop_event,
+        )
+        indexer_daemon.start_loops_and_queues()
+
+        consumer = CeleryMessageConsumer(celery_app, indexer_daemon)
+        threading.Thread(target=consumer.run).start()
+
+    def __init__(self, index_name, index_setup, stop_event):
+        self.index_name = index_name
+        self.stop_event = stop_event
+        self.__index_setup = index_setup
+
+        self.__thread_pool = None
+        self.__incoming_message_queues = {}
+        self.__outgoing_action_queue = None
+
     def stop(self):
-        # should_stop is defined in ConsumerMixin
-        if not self.should_stop:
-            logger.warning('%r (%s): Shutting down', self, id(self))
-            self.should_stop = True
+        if not self.stop_event.is_set():
+            logger.warning('%r: Stopping', self)
             self.__thread_pool.shutdown(wait=False)
-            self.__stop_event.set()
+            self.stop_event.set()
 
     @property
     def all_queues_empty(self):
@@ -96,10 +106,10 @@ class SearchIndexerDaemon(ConsumerMixin):
         )
 
     def __wait_on_stop_event(self):
-        self.__stop_event.wait()
+        self.stop_event.wait()
         self.stop()
 
-    def __start_loops_and_queues(self):
+    def start_loops_and_queues(self):
         if self.__thread_pool:
             raise DaemonSetupError('SearchIndexerDaemon already set up!')
 
@@ -120,7 +130,7 @@ class SearchIndexerDaemon(ConsumerMixin):
             self.__incoming_message_queues[message_type] = message_queue
             self.__thread_pool.submit(self.__incoming_message_loop, message_type)
 
-    def __on_message(self, body, message):
+    def on_message(self, body, message):
         wrapped_message = IndexableMessage.wrap(message)
 
         message_queue = self.__incoming_message_queues.get(wrapped_message.message_type)
@@ -136,12 +146,12 @@ class SearchIndexerDaemon(ConsumerMixin):
             loop = IncomingMessageLoop(
                 message_queue=self.__incoming_message_queues[message_type],
                 outgoing_action_queue=self.__outgoing_action_queue,
-                action_generator=self.__index_setup.build_action_generator(self.__index_name, message_type),
+                action_generator=self.__index_setup.build_action_generator(self.index_name, message_type),
                 log_prefix=log_prefix,
             )
 
-            while not self.should_stop:
-                loop.iterate_once(self.__stop_event)
+            while not self.stop_event.is_set():
+                loop.iterate_once(self.stop_event)
 
         except Exception as e:
             client.captureException()
@@ -157,7 +167,7 @@ class SearchIndexerDaemon(ConsumerMixin):
                 log_prefix=log_prefix,
             )
 
-            while not self.should_stop:
+            while not self.stop_event.is_set():
                 loop.iterate_once()
 
         except Exception as e:
@@ -167,7 +177,7 @@ class SearchIndexerDaemon(ConsumerMixin):
             self.stop()
 
     def __repr__(self):
-        return '<{}({})>'.format(self.__class__.__name__, self.__index_name)
+        return '<{}({})>'.format(self.__class__.__name__, self.index_name)
 
 
 class IncomingMessageLoop:
