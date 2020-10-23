@@ -4,13 +4,8 @@ import queue as local_queue
 import threading
 import time
 
-from django.conf import settings
-
 from kombu import Queue as KombuQueue
 from kombu.mixins import ConsumerMixin
-
-from elasticsearch import Elasticsearch
-from elasticsearch import helpers
 
 from raven.contrib.django.raven_compat.models import client
 
@@ -26,10 +21,11 @@ LOOP_TIMEOUT = 5
 class CeleryMessageConsumer(ConsumerMixin):
     PREFETCH_COUNT = 7500
 
-    def __init__(self, celery_app, indexer_daemon):
+    def __init__(self, celery_app, indexer_daemon, elastic_manager):
         self.connection = celery_app.pool.acquire(block=True)
         self.celery_app = celery_app
         self.__indexer_daemon = indexer_daemon
+        self.__elastic_manager = elastic_manager
 
     # overrides ConsumerMixin.run
     def run(self):
@@ -49,8 +45,8 @@ class CeleryMessageConsumer(ConsumerMixin):
 
     # for ConsumerMixin -- specifies rabbit queues to consume, registers on_message callback
     def get_consumers(self, Consumer, channel):
-        kombu_queue_settings = settings.ELASTICSEARCH['KOMBU_QUEUE_SETTINGS']
-        index_settings = settings.ELASTICSEARCH['INDEXES'][self.__indexer_daemon.index_name]
+        kombu_queue_settings = self.__elastic_manager.settings['KOMBU_QUEUE_SETTINGS']
+        index_settings = self.__elastic_manager.settings['INDEXES'][self.__indexer_daemon.index_name]
         return [
             Consumer(
                 [
@@ -75,18 +71,20 @@ class SearchIndexerDaemon:
     def start_indexer_in_thread(cls, celery_app, stop_event, elastic_manager, index_name):
         indexer_daemon = cls(
             index_name=index_name,
-            index_setup=elastic_manager.get_index_setup(index_name),
+            elastic_manager=elastic_manager,
             stop_event=stop_event,
         )
         indexer_daemon.start_loops_and_queues()
 
-        consumer = CeleryMessageConsumer(celery_app, indexer_daemon)
+        consumer = CeleryMessageConsumer(celery_app, indexer_daemon, elastic_manager)
         threading.Thread(target=consumer.run).start()
 
-    def __init__(self, index_name, index_setup, stop_event):
+    def __init__(self, index_name, elastic_manager, stop_event):
         self.index_name = index_name
         self.stop_event = stop_event
-        self.__index_setup = index_setup
+        self.__elastic_manager = elastic_manager
+
+        self.__index_setup = self.__elastic_manager.get_index_setup(index_name)
 
         self.__thread_pool = None
         self.__incoming_message_queues = {}
@@ -147,6 +145,7 @@ class SearchIndexerDaemon:
                 message_queue=self.__incoming_message_queues[message_type],
                 outgoing_action_queue=self.__outgoing_action_queue,
                 action_generator=self.__index_setup.build_action_generator(self.index_name, message_type),
+                chunk_size=self.__elastic_manager.settings['CHUNK_SIZE'],
                 log_prefix=log_prefix,
             )
 
@@ -164,6 +163,8 @@ class SearchIndexerDaemon:
             log_prefix = f'{repr(self)} OutgoingActionLoop: '
             loop = OutgoingActionLoop(
                 action_queue=self.__outgoing_action_queue,
+                elastic_manager=self.__elastic_manager,
+                chunk_size=self.__elastic_manager.settings['CHUNK_SIZE'],
                 log_prefix=log_prefix,
             )
 
@@ -181,44 +182,49 @@ class SearchIndexerDaemon:
 
 
 class IncomingMessageLoop:
-    def __init__(self, message_queue, outgoing_action_queue, action_generator, log_prefix):
+    def __init__(self, message_queue, outgoing_action_queue, action_generator, chunk_size, log_prefix):
         self.message_queue = message_queue
         self.outgoing_action_queue = outgoing_action_queue
         self.action_generator = action_generator
+        self.chunk_size = chunk_size
         self.log_prefix = log_prefix
-
-        self.chunk_size = settings.ELASTICSEARCH['CHUNK_SIZE']
 
         logger.info('%sStarted', self.log_prefix)
 
-    def iterate_once(self, stop_event):
-        message_chunk = []
-        target_ids = set()  # for avoiding duplicate messages within one chunk
-        while len(message_chunk) < self.chunk_size:
+    def _get_target_id_chunk(self):
+        messages_by_id = {}
+        target_id_chunk = []
+        while len(target_id_chunk) < self.chunk_size:
             try:
                 # If we have any messages queued up, push them through ASAP
-                message = self.message_queue.get(timeout=.1 if message_chunk else LOOP_TIMEOUT)
+                message = self.message_queue.get(timeout=.1 if target_id_chunk else LOOP_TIMEOUT)
 
-                if message.target_id in target_ids:
+                if message.target_id in messages_by_id:
                     # skip processing duplicate messages in one chunk
                     message.ack()
                 else:
-                    target_ids.add(message.target_id)
-                    message_chunk.append(message)
+                    messages_by_id[message.target_id] = message
+                    target_id_chunk.append(message.target_id)
             except local_queue.Empty:
                 break
+        return target_id_chunk, messages_by_id
 
-        if not message_chunk:
+    def iterate_once(self, stop_event):
+        target_id_chunk, messages_by_id = self._get_target_id_chunk()
+
+        if not target_id_chunk:
             logger.debug('%sRecieved no messages to queue up', self.log_prefix)
             return
 
         start = time.time()
-        logger.debug('%sPreparing %d docs to be indexed', self.log_prefix, len(message_chunk))
+        logger.debug('%sPreparing %d docs to be indexed', self.log_prefix, len(target_id_chunk))
 
         success_count = 0
         # at this point, we have a chunk of messages, each with exactly one pk
         # each message should turn into one elastic action/doc
-        for message, action in self.action_generator(message_chunk):
+        for target_id, action in self.action_generator(target_id_chunk):
+            message = messages_by_id[target_id]
+
             # Keep blocking on put() until there's space in the queue or it's time to stop
             while not stop_event.is_set():
                 try:
@@ -246,52 +252,34 @@ class OutgoingActionLoop:
 
     MAX_CHUNK_BYTES = 10 * 1024 ** 2  # 10 megs
 
-    def __init__(self, action_queue, log_prefix):
+    def __init__(self, action_queue, elastic_manager, chunk_size, log_prefix):
         self.action_queue = action_queue
+        self.elastic_manager = elastic_manager
+        self.chunk_size = chunk_size
         self.log_prefix = log_prefix
 
-        self.chunk_size = settings.ELASTICSEARCH['CHUNK_SIZE']
         self.messages_awaiting_elastic = {}
-
-        self.es_client = Elasticsearch(
-            settings.ELASTICSEARCH['URL'],
-            retry_on_timeout=True,
-            timeout=settings.ELASTICSEARCH['TIMEOUT'],
-            # sniff before doing anything
-            sniff_on_start=settings.ELASTICSEARCH['SNIFF'],
-            # refresh nodes after a node fails to respond
-            sniff_on_connection_fail=settings.ELASTICSEARCH['SNIFF'],
-            # and also every 60 seconds
-            sniffer_timeout=60 if settings.ELASTICSEARCH['SNIFF'] else None,
-        )
 
         logger.info('%sStarted', self.log_prefix)
 
     def iterate_once(self):
-        action_chunk = self.action_chunk_iter()
-
-        elastic_stream = helpers.streaming_bulk(
-            self.es_client,
-            action_chunk,
-            max_chunk_bytes=self.MAX_CHUNK_BYTES,
-            raise_on_error=False,
-        )
-
+        start_time = time.time()
         doc_count = 0
-        start = time.time()
-        for (ok, resp) in elastic_stream:
-            op_type, resp_body = next(iter(resp.items()))
+        action_chunk = self.action_chunk_iter()
+        elastic_stream = self.elastic_manager.stream_actions(action_chunk)
 
-            if not ok and not (resp.get('delete') and resp['delete']['status'] == 404):
-                raise DaemonIndexingError(ok, resp)
+        for (ok, op_type, response) in elastic_stream:
+            if not ok and not (op_type == 'delete' and response['status'] == 404):
+                raise DaemonIndexingError(ok, response)
 
-            message = self.messages_awaiting_elastic.pop(resp_body['_id'])
+            message = self.messages_awaiting_elastic.pop(response['_id'])
             message.ack()
 
+        time_elapsed = time.time() - start_time
         if doc_count:
-            logger.info('%sIndexed %d documents in %.02fs', self.log_prefix, doc_count, time.time() - start)
+            logger.info('%sIndexed %d documents in %.02fs', self.log_prefix, doc_count, time_elapsed)
         else:
-            logger.debug('%sRecieved no messages for %.02fs', self.log_prefix, time.time() - start)
+            logger.debug('%sRecieved no messages for %.02fs', self.log_prefix, time_elapsed)
 
         if self.messages_awaiting_elastic:
             raise DaemonIndexingError(f'Messages left awaiting elastic! ¿something happened? {self.messages_awaiting_elastic}')
@@ -304,8 +292,8 @@ class OutgoingActionLoop:
                     message.ack()
                     continue
                 if action['_id'] in self.messages_awaiting_elastic:
-                    # TODO dedupe earlier (or just ack it?)
-                    raise DaemonMessageError('duplicate messages in one chunk -- handle this i guess')
+                    # should have been deduped in IncomingMessageLoop
+                    raise DaemonMessageError('duplicate messages in one chunk -- should not happen')
                 self.messages_awaiting_elastic[action['_id']] = message
                 yield action
             except local_queue.Empty:

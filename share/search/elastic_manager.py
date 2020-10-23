@@ -1,6 +1,6 @@
 import logging
 
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers as elastic_helpers
 
 from django.conf import settings
 
@@ -11,9 +11,21 @@ logger = logging.getLogger(__name__)
 
 
 class ElasticManager:
+    MAX_CHUNK_BYTES = 10 * 1024 ** 2  # 10 megs
+
     def __init__(self, custom_settings=None):
         self.settings = custom_settings or settings.ELASTICSEARCH
-        self.es_client = Elasticsearch(self.settings['URL'])
+        self.es_client = Elasticsearch(
+            self.settings['URL'],
+            retry_on_timeout=True,
+            timeout=settings.ELASTICSEARCH['TIMEOUT'],
+            # sniff before doing anything
+            sniff_on_start=settings.ELASTICSEARCH['SNIFF'],
+            # refresh nodes after a node fails to respond
+            sniff_on_connection_fail=settings.ELASTICSEARCH['SNIFF'],
+            # and also every 60 seconds
+            sniffer_timeout=60 if settings.ELASTICSEARCH['SNIFF'] else None,
+        )
 
     def get_index_setup(self, index_name):
         index_setup_name = self.settings['INDEXES'][index_name]['INDEX_SETUP']
@@ -52,3 +64,20 @@ class ElasticManager:
         self.es_client.indices.refresh(index_name)
 
         logger.info('Finished setting up Elasticsearch index %s', index_name)
+
+    def stream_actions(self, actions):
+        stream = elastic_helpers.streaming_bulk(
+            self.es_client,
+            actions,
+            max_chunk_bytes=self.MAX_CHUNK_BYTES,
+            raise_on_error=False,
+        )
+        for (ok, response) in stream:
+            op_type, response_body = next(iter(response.items()))
+            yield (ok, op_type, response_body)
+
+    def send_actions_sync(self, actions):
+        elastic_helpers.bulk(self.es_client, actions)
+
+    def refresh_indexes(self, index_names):
+        self.es_client.indices.refresh(index=','.join(index_names))

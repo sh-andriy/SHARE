@@ -1,13 +1,11 @@
 from contextlib import ExitStack
-from elasticsearch import Elasticsearch, helpers as elastic_helpers
 
 from django.apps import apps
-from django.conf import settings
 from django.db.models import Q
 
 from share.models import AbstractCreativeWork
 from share.search.elastic_manager import ElasticManager
-from share.search.messages import FakeMessage, MessageType
+from share.search.messages import MessageType
 
 
 __all__ = ('SearchIndexer', 'MessageType')
@@ -72,31 +70,15 @@ class SearchIndexer:
         if not index_names:
             index_names = self.elastic_manager.settings['ACTIVE_INDEXES']
 
-        es_client = Elasticsearch(
-            settings.ELASTICSEARCH['URL'],
-            retry_on_timeout=True,
-            timeout=settings.ELASTICSEARCH['TIMEOUT'],
-            # sniff before doing anything
-            sniff_on_start=settings.ELASTICSEARCH['SNIFF'],
-            # refresh nodes after a node fails to respond
-            sniff_on_connection_fail=settings.ELASTICSEARCH['SNIFF'],
-            # and also every 60 seconds
-            sniffer_timeout=60 if settings.ELASTICSEARCH['SNIFF'] else None,
-        )
-
-        message_chunk = [
-            FakeMessage(message_type, target_id)
-            for target_id in target_ids
-        ]
         for index_name in index_names:
             index_setup = self.elastic_manager.get_index_setup(index_name)
             action_generator = index_setup.build_action_generator(index_name, message_type)
             elastic_actions = [
                 elastic_action
-                for (_, elastic_action) in action_generator(message_chunk)
+                for (_, elastic_action) in action_generator(target_ids)
             ]
-            elastic_helpers.bulk(es_client, elastic_actions)
-        es_client.indices.refresh(index=','.join(index_names))
+            self.elastic_manager.send_actions_sync(elastic_actions)
+        self.elastic_manager.refresh_indexes(index_names)
 
     # consider the below deprecated -- should be removed along with ShareObject
     def index(self, model_name, *pks, index=None, urgent=False):

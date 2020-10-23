@@ -13,24 +13,6 @@ class MessageType(Enum):
     INDEX_SUID = 'suid'
 
 
-class FakeMessage:
-
-    def __init__(self, message_type, target_id):
-        self.message_type = message_type
-        self.target_id = target_id
-        self.payload = {
-            'version': 2,
-            'message_type': message_type.value,
-            'target_id': target_id,
-        }
-
-    def ack(self):
-        return True
-
-    def requeue(self):
-        return True
-
-
 class IndexableMessage:
     PROTOCOL_VERSION = None
 

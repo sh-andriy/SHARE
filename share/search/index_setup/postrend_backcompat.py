@@ -163,11 +163,11 @@ class PostRendBackcompatIndexSetup(IndexSetup):
             '_type': self.get_es_doc_type(message_type),
         }
 
-        def action_generator(message_iter):
-            for message in message_iter:
-                source_doc = self.get_cached_source_doc(message_type, message.target_id)
+        def action_generator(target_id_iter):
+            for target_id in target_id_iter:
+                source_doc = self.get_cached_source_doc(message_type, target_id)
                 if source_doc is None:
-                    source_doc = self.build_and_cache_source_doc(message_type, message.target_id)
+                    source_doc = self.build_and_cache_source_doc(message_type, target_id)
 
                 if source_doc.pop('is_deleted', False):
                     action = {
@@ -182,5 +182,5 @@ class PostRendBackcompatIndexSetup(IndexSetup):
                         '_op_type': 'index',
                         '_source': source_doc,
                     }
-                yield (message, action)
+                yield (target_id, action)
         return action_generator

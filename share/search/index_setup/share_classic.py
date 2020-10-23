@@ -45,15 +45,15 @@ class ShareClassicIndexSetup(IndexSetup):
             '_type': doc_type
         }
 
-        def action_generator(message_iter):
-            for message, result in zip(message_iter, fetcher(msg.target_id for msg in message_iter)):
+        def action_generator(target_id_iter):
+            for target_id, result in zip(target_id_iter, fetcher(target_id_iter)):
                 if result is None:
                     action = None
                 elif result.pop('is_deleted', False):
                     action = {'_id': result['id'], '_op_type': 'delete', **action_template}
                 else:
                     action = {'_id': result['id'], '_op_type': 'index', **action_template, '_source': result}
-                yield (message, action)
+                yield (target_id, action)
         return action_generator
 
     def _get_model_and_doc_type(self, message_type):
