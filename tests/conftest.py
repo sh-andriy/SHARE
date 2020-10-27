@@ -258,7 +258,7 @@ def elastic_test_manager(settings, elastic_test_index_name):
     elastic_manager = ElasticManager()
     try:
         elastic_manager.delete_index(elastic_test_index_name)
-        elastic_manager.set_up_index(elastic_test_index_name)
+        elastic_manager.create_index(elastic_test_index_name)
 
         yield elastic_manager
 

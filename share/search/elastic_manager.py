@@ -15,16 +15,17 @@ class ElasticManager:
 
     def __init__(self, custom_settings=None):
         self.settings = custom_settings or settings.ELASTICSEARCH
+
         self.es_client = Elasticsearch(
             self.settings['URL'],
             retry_on_timeout=True,
-            timeout=settings.ELASTICSEARCH['TIMEOUT'],
+            timeout=self.settings['TIMEOUT'],
             # sniff before doing anything
-            sniff_on_start=settings.ELASTICSEARCH['SNIFF'],
+            sniff_on_start=self.settings['SNIFF'],
             # refresh nodes after a node fails to respond
-            sniff_on_connection_fail=settings.ELASTICSEARCH['SNIFF'],
+            sniff_on_connection_fail=self.settings['SNIFF'],
             # and also every 60 seconds
-            sniffer_timeout=60 if settings.ELASTICSEARCH['SNIFF'] else None,
+            sniffer_timeout=60 if self.settings['SNIFF'] else None,
         )
 
     def get_index_setup(self, index_name):
@@ -35,7 +36,7 @@ class ElasticManager:
         logger.warn(f'ElasticManager: deleting index {index_name}')
         self.es_client.indices.delete(index=index_name, ignore=[400, 404])
 
-    def set_up_index(self, index_name):
+    def create_index(self, index_name):
         index_setup = self.get_index_setup(index_name)
 
         # TODO think about this

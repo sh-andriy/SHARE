@@ -50,7 +50,7 @@ class FakeElasticManager:
     #
     # def delete_index(self, index_name):
     #
-    # def set_up_index(self, index_name):
+    # def create_index(self, index_name):
 
 
 class FakeIndexSetup:

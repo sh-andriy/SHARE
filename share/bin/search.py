@@ -46,7 +46,7 @@ def setup(args, argv):
     Options:
         -i, --index=INDEX    The name of the Elasticsearch index to use.
     """
-    ElasticManager().set_up_index(args.get('--index'))
+    ElasticManager().create_index(args.get('--index'))
 
 
 @search.subcommand('Start the search indexing daemon')
