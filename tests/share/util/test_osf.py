@@ -1,6 +1,6 @@
 import pytest
 
-from share.util.osf import guess_osf_guid, get_central_work, get_guid_from_uri
+from share.util.osf import guess_osf_guid, get_guid_from_uri
 
 from tests.share.normalize import factories as f
 
@@ -35,7 +35,7 @@ def test_get_guid_from_uri(uri, expected):
     (f.Agent(id='a'), None),
 ])
 def test_get_central_work(ExpectedGraph, graph_input, expected_node_id):
-    actual = get_central_work(ExpectedGraph(graph_input))
+    actual = ExpectedGraph(graph_input).get_central_node()
     if expected_node_id is None:
         assert actual is None
     else:

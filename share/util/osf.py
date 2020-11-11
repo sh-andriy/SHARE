@@ -24,18 +24,8 @@ def get_guid_from_uri(uri: str):
     return match.group('guid') if match else None
 
 
-def get_central_work(mgraph: MutableGraph):
-    work_nodes = mgraph.filter_by_concrete_type('abstractcreativework')
-    if not work_nodes:
-        return None
-
-    # get the work node with the most attrs
-    work_nodes.sort(key=lambda n: len(n.attrs()), reverse=True)
-    return work_nodes[0]
-
-
 def guess_osf_guid(mgraph: MutableGraph):
-    central_work = get_central_work(mgraph)
+    central_work = mgraph.get_central_node(guess=True)
     if not central_work:
         return None
 

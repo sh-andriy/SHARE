@@ -65,7 +65,11 @@ class MutableGraph(nx.DiGraph):
         """
         if isinstance(nodes, dict):
             nodes = nodes['@graph']
+            central_node_id = nodes.get('central_node_id', None)
         graph = cls()
+        if central_node_id:
+            graph.central_node_id = central_node_id
+
         for n in nodes:
             node_id, node_type = None, None
             attrs = {}
@@ -89,6 +93,7 @@ class MutableGraph(nx.DiGraph):
     def __init__(self):
         super().__init__()
         self.changed = False
+        self.central_node_id = None
 
     def to_jsonld(self, in_edges=True):
         """Return a list of JSON-LD-style dicts.
@@ -129,6 +134,17 @@ class MutableGraph(nx.DiGraph):
         if node_id in self:
             return MutableNode(self, node_id)
         return None
+
+    def get_central_node(self, guess=False):
+        if guess and self.central_node_id is None:
+            work_nodes = self.filter_by_concrete_type('abstractcreativework')
+            if work_nodes:
+                # get the work node with the most attrs
+                work_nodes.sort(key=lambda n: len(n.attrs()), reverse=True)
+                central_node = work_nodes[0]
+                self.central_node_id = central_node.id
+
+        return self.get_node(self.central_node_id)
 
     def remove_node(self, node_id, cascade=True):
         """Remove a node and its incoming/outgoing edges.
