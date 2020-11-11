@@ -13,8 +13,6 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
-from model_utils import Choices
-
 from oauth2_provider.models import AccessToken, Application
 
 from osf_oauth2_adapter.apps import OsfOauth2AdapterConfig
@@ -22,6 +20,7 @@ from osf_oauth2_adapter.apps import OsfOauth2AdapterConfig
 from share.models.fields import DateTimeAwareJSONField, ShareURLField
 from share.models.validators import JSONLDValidator
 from share.util import BaseJSONAPIMeta
+from share.util.extensions import Extensions
 
 logger = logging.getLogger(__name__)
 __all__ = ('ShareUser', 'NormalizedData',)
@@ -203,24 +202,46 @@ class NormalizedData(models.Model):
     __repr__ = __str__
 
 
-class CachedElasticDoc(models.Model):
-    DOC_FORMAT = Choices(
-        ('BC', _('Back-compatible')),  # same as used to be build from the ShareObject family
-        ('TR', _('Trove-style')),
-    )
+class FormattedMetadataRecordManager(models.Manager):
+    def update_or_create_formatted_metadata_record(self, suid, record_format):
+        formatter = Extensions.get('share.metadata_formats', record_format)()
+        normalized_data = NormalizedData.objects.filter(raw__suid=suid).order_by('-created_at').first()
+
+        formatted_metadata = formatter.format(normalized_data)
+        record, _ = self.update_or_create(
+            suid=suid,
+            record_format=record_format,
+            defaults={
+                'formatted_metadata': formatted_metadata,
+            },
+        )
+        return record
+
+    def get_or_create_formatted_metadata_record(self, suid, record_format):
+        try:
+            formatted_record = self.get(suid=suid, record_format=record_format)
+        except self.model.DoesNotExist:
+            formatted_record = self.create_or_update_formatted_metadata_record(suid, record_format)
+        return formatted_record
+
+
+class FormattedMetadataRecord(models.Model):
+    objects = FormattedMetadataRecordManager()
 
     id = models.AutoField(primary_key=True)
 
-    suid = models.ForeignKey('SourceUniqueIdentifier', on_delete=models.CASCADE)
-    doc_format = models.CharField(max_length=2, choices=DOC_FORMAT)
+    suid = models.ManyToMany('SourceUniqueIdentifier', on_delete=models.CASCADE)
 
-    date_created = models.DateTimeField(auto_now_add=True)
+    # TODO choices? could get list of entry points, base it on that
+    record_format = models.TextField()
+
     date_modified = models.DateTimeField(auto_now=True)
 
-    elastic_doc = DateTimeAwareJSONField()  # TODO validator?
+    # could be JSON, XML, or whatever
+    formatted_metadata = models.TextField()
 
     class Meta:
-        unique_together = ('suid', 'doc_format')
+        unique_together = ('suid', 'record_format')
 
     def __repr__(self):
         return f'<{self.__class__.__name__}({self.id}, {self.suid_id}, {self.doc_format})>'

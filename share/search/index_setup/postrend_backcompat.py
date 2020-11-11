@@ -1,6 +1,8 @@
+from share.models import NormalizedData, SourceUniqueIdentifier
 from share.search.exceptions import IndexSetupError
 from share.search.index_setup.base import IndexSetup
 from share.search.messages import MessageType
+from share.util.graph import MutableGraph
 
 
 class PostRendBackcompatIndexSetup(IndexSetup):
@@ -151,12 +153,8 @@ class PostRendBackcompatIndexSetup(IndexSetup):
             },
         }
 
-    def build_and_cache_source_doc(self, index_name, message_type):
-        pass  # TODO
-
     def build_action_generator(self, index_name, message_type):
-        if message_type not in self.supported_message_types:
-            raise IndexSetupError(f'Invalid message_type "{message_type}" (expected {self.supported_message_types})')
+        self.assert_message_type(message_type)
 
         action_template = {
             '_index': index_name,
@@ -167,6 +165,9 @@ class PostRendBackcompatIndexSetup(IndexSetup):
             for target_id in target_id_iter:
                 source_doc = self.get_cached_source_doc(message_type, target_id)
                 if source_doc is None:
+                    # TODO this'll put a lot of extra strain on the indexer daemon first time 'round...
+                    # newly ingested stuff will have this done in the ingest task, but existing data
+                    # won't... should we instead plan to re-run ingest for everything?
                     source_doc = self.build_and_cache_source_doc(message_type, target_id)
 
                 if source_doc.pop('is_deleted', False):
