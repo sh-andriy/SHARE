@@ -1,4 +1,5 @@
 from share.models import NormalizedData, SourceUniqueIdentifier
+from share.models.core import FormattedMetadataRecord
 from share.search.exceptions import IndexSetupError
 from share.search.index_setup.base import IndexSetup
 from share.search.messages import MessageType

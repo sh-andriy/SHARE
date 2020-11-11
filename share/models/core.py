@@ -231,9 +231,9 @@ class FormattedMetadataRecord(models.Model):
 
     id = models.AutoField(primary_key=True)
 
-    suid = models.ManyToMany('SourceUniqueIdentifier', on_delete=models.CASCADE)
+    suid = models.ForeignKey('SourceUniqueIdentifier', on_delete=models.CASCADE)
 
-    # TODO choices? could get list of entry points, base it on that
+    entry_points = Extensions.get_names('share.metadata_formats')
     record_format = models.TextField()
 
     date_modified = models.DateTimeField(auto_now=True)
