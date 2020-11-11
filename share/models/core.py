@@ -203,9 +203,10 @@ class NormalizedData(models.Model):
 
 
 class FormattedMetadataRecordManager(models.Manager):
-    def update_or_create_formatted_metadata_record(self, suid, record_format):
+    def update_or_create_formatted_metadata_record(self, suid, record_format, normalized_data=None):
         formatter = Extensions.get('share.metadata_formats', record_format)()
-        normalized_data = NormalizedData.objects.filter(raw__suid=suid).order_by('-created_at').first()
+        if normalized_data is None:
+            normalized_data = NormalizedData.objects.filter(raw__suid=suid).order_by('-created_at').first()
 
         formatted_metadata = formatter.format(normalized_data)
         record, _ = self.update_or_create(

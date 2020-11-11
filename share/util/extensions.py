@@ -17,13 +17,9 @@ class Extensions:
         raise NotImplementedError()
 
     @classmethod
-    def get_all(cls, namespace):
-        try:
-            manager = cls._get_manager(namespace)
-            for name in manager.names():
-                yield name, manager[name].plugin
-        except Exception as exc:
-            raise ExtensionsError(f'Error loading extension ("{namespace}", "{name}")') from exc
+    def get_names(cls, namespace):
+        manager = cls._get_manager(namespace)
+        return manager.names()
 
     @classmethod
     def get(cls, namespace, name):

@@ -18,6 +18,7 @@ from share.models import (
     NormalizedData,
     RawDatum,
 )
+from share.models.core import FormattedMetadataRecord
 from share.models.ingest import RawDatumJob
 from share.regulate import Regulator
 from share.search import SearchIndexer
@@ -329,15 +330,16 @@ class IngestJobConsumer(JobConsumer):
         else:
             graph = MutableGraph.from_jsonld(datum.data)
 
+        self._save_formatted_metadata(job.suid, datum)
+
         if apply_changes:
             # soon-to-be-rended ShareObject-based process:
             updated_work_ids = self._apply_changes(job, graph, datum)
             if index and updated_work_ids:
                 self._update_index(updated_work_ids, urgent)
 
+        # new Suid-based process
         if index:
-            # new Suid-based process
-            self._cache_elastic_docs(job.suid, datum)
             self._queue_for_indexing(job.suid, urgent)
 
     def _transform(self, job):
@@ -366,15 +368,13 @@ class IngestJobConsumer(JobConsumer):
             job.fail(e)
             return None
 
-    def _cache_elastic_docs(self, suid, normalized_datum):
-        index_setup_names = {
-            index_settings['INDEX_SETUP']
-            for index_settings in settings.ELASTICSEARCH['INDEXES'].values()
-        }
-        for index_setup_name in index_setup_names:
-            index_setup = Extensions.get('share.search.index_setup', index_setup_name)()
-            if MessageType.INDEX_SUID in index_setup.supported_message_types:
-                index_setup.build_and_cache_source_doc(MessageType.INDEX_SUID, suid.id)
+    def _save_formatted_metadata(self, suid, normalized_datum):
+        for format_name in Extensions.get_names('share.metadata_formats'):
+            FormattedMetadataRecord.objects.update_or_create_formatted_metadata_record(
+                suid,
+                format_name,
+                normalized_datum,
+            )
 
     def _queue_for_indexing(self, suid, urgent):
         indexer = SearchIndexer(self.task.app) if self.task else SearchIndexer()

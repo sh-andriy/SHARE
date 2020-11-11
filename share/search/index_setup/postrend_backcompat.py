@@ -163,6 +163,7 @@ class PostRendBackcompatIndexSetup(IndexSetup):
 
         def action_generator(target_id_iter):
             for target_id in target_id_iter:
+                # TODO next: pull from FormattedMetadataRecord model
                 source_doc = self.get_cached_source_doc(message_type, target_id)
                 if source_doc is None:
                     # TODO this'll put a lot of extra strain on the indexer daemon first time 'round...
