@@ -223,7 +223,7 @@ class IncomingMessageLoop:
         # at this point, we have a chunk of messages, each with exactly one pk
         # each message should turn into one elastic action/doc
         for target_id, action in self.action_generator(target_id_chunk):
-            message = messages_by_id[target_id]
+            message = messages_by_id.pop(target_id)
 
             # Keep blocking on put() until there's space in the queue or it's time to stop
             while not stop_event.is_set():
@@ -233,6 +233,9 @@ class IncomingMessageLoop:
                     break
                 except local_queue.Full:
                     continue
+
+        if messages_by_id:
+            raise DaemonIndexingError(f'Action generator skipped some target_ids! {messages_by_id}')
 
         logger.info('%sPrepared %d docs to be indexed in %.02fs', self.log_prefix, success_count, time.time() - start)
 

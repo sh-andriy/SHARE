@@ -1,9 +1,6 @@
-from share.models import NormalizedData, SourceUniqueIdentifier
 from share.models.core import FormattedMetadataRecord
-from share.search.exceptions import IndexSetupError
 from share.search.index_setup.base import IndexSetup
 from share.search.messages import MessageType
-from share.util.graph import MutableGraph
 
 
 class PostRendBackcompatIndexSetup(IndexSetup):
@@ -163,15 +160,12 @@ class PostRendBackcompatIndexSetup(IndexSetup):
         }
 
         def action_generator(target_id_iter):
-            for target_id in target_id_iter:
-                # TODO next: pull from FormattedMetadataRecord model
-                source_doc = self.get_cached_source_doc(message_type, target_id)
-                if source_doc is None:
-                    # TODO this'll put a lot of extra strain on the indexer daemon first time 'round...
-                    # newly ingested stuff will have this done in the ingest task, but existing data
-                    # won't... should we instead plan to re-run ingest for everything?
-                    source_doc = self.build_and_cache_source_doc(message_type, target_id)
-
+            record_qs = FormattedMetadataRecord.objects.filter(
+                suid_id__in=target_id_iter,
+                record_format='sharev2_elastic',  # TODO specify in config? or don't
+            )
+            for record in record_qs:
+                source_doc = record.formatted_metadata
                 if source_doc.pop('is_deleted', False):
                     action = {
                         **action_template,
@@ -185,5 +179,5 @@ class PostRendBackcompatIndexSetup(IndexSetup):
                         '_op_type': 'index',
                         '_source': source_doc,
                     }
-                yield (target_id, action)
+                yield (record.suid_id, action)
         return action_generator

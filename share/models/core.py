@@ -3,6 +3,8 @@ import logging
 import random
 import string
 
+from model_utils import Choices
+
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin, Group
@@ -227,22 +229,18 @@ class FormattedMetadataRecordManager(models.Manager):
 
 
 class FormattedMetadataRecord(models.Model):
+    RECORD_FORMAT = Choices(*Extensions.get_names('share.metadata_formats'))
+
     objects = FormattedMetadataRecordManager()
 
     id = models.AutoField(primary_key=True)
-
     suid = models.ForeignKey('SourceUniqueIdentifier', on_delete=models.CASCADE)
-
-    entry_points = Extensions.get_names('share.metadata_formats')
-    record_format = models.TextField()
-
+    record_format = models.TextField(choices=RECORD_FORMAT)
     date_modified = models.DateTimeField(auto_now=True)
-
-    # could be JSON, XML, or whatever
-    formatted_metadata = models.TextField()
+    formatted_metadata = models.TextField()  # could be JSON, XML, or whatever
 
     class Meta:
         unique_together = ('suid', 'record_format')
 
     def __repr__(self):
-        return f'<{self.__class__.__name__}({self.id}, {self.suid_id}, {self.doc_format})>'
+        return f'<{self.__class__.__name__}({self.id}, {self.suid_id}, {self.record_format})>'
