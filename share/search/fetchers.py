@@ -446,7 +446,9 @@ class CreativeWorkFetcher(Fetcher):
             except ValueError:
                 pass
 
-            parent_model = next(parent for parent in relation_model.__mro__ if not parent.__mro__[2]._meta.proxy)
+            parent_model = next(
+                parent for parent in relation_model.__mro__ if not parent.__mro__[2]._meta.proxy
+            )
             parent_name = str(parent_model._meta.verbose_name_plural)
             agent['relation'] = relation_model._meta.verbose_name
             data['lists'].setdefault(parent_name, []).append(agent)
