@@ -47,7 +47,7 @@ class ShareV2ElasticFormatter(MetadataFormatter):
             'subject_synonyms': self._get_subject_synonyms(central_work),
 
             # post-process:
-            #   'date': None,
+            'date': central_work['date_published'] or central_work['date_updated'] or normalized_datum.created_at.isoformat(),
             #   'types': None,
             #   'lists': None,
         }
