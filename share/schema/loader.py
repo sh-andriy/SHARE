@@ -71,19 +71,21 @@ class SchemaLoader:
         )
         self._add_relation(relation.related_concrete_type, inverse_relation)
 
-    def _add_type(self, concrete_type, type_name, distance_from_concrete_type=0):
+    def _add_type(self, concrete_type, type_name, type_lineage=()):
         self.schema_types[type_name.lower()] = ShareV2SchemaType(
             name=type_name,
             concrete_type=concrete_type,
-            distance_from_concrete_type=distance_from_concrete_type,
+            type_lineage=type_lineage,
+            distance_from_concrete_type=len(type_lineage),
             explicit_fields=set(self.explicit_field_names.get(concrete_type, [])),
         )
 
-    def _add_type_tree(self, concrete_type, type_tree, depth=1):
+    def _add_type_tree(self, concrete_type, type_tree, parent_type_lineage=()):
         for type_name, subtree in type_tree.items():
-            self._add_type(concrete_type, type_name, depth)
+            type_lineage = (type_name, *parent_type_lineage)
+            self._add_type(concrete_type, type_name, type_lineage)
             if subtree:
-                self._add_type_tree(concrete_type, subtree, depth + 1)
+                self._add_type_tree(concrete_type, subtree, type_lineage)
 
     def _add_relation(self, concrete_type, relation):
         key = (concrete_type.lower(), relation.name.lower())

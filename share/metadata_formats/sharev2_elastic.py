@@ -33,23 +33,51 @@ class ShareV2ElasticFormatter(MetadataFormatter):
             'type': central_work.type,
             'withdrawn': central_work['withdrawn'],
 
+            'date': (
+                central_work['date_published']
+                or central_work['date_updated']
+                or normalized_datum.created_at.isoformat()
+            ),
+            'types': central_work.schema_type.type_lineage,
+
             # agent relations:
             'affiliations': self._get_related_agent_names(central_work, ['agentworkrelation']),
-            'contributors': self._get_related_agent_names(central_work, ['contributor', 'creator', 'principalinvestigator', 'principalinvestigatorcontact']),
+            'contributors': self._get_related_agent_names(central_work, [
+                'contributor',
+                'creator',
+                'principalinvestigator',
+                'principalinvestigatorcontact',
+            ]),
             'funders': self._get_related_agent_names(central_work, ['funder']),
             'publishers': self._get_related_agent_names(central_work, ['publisher']),
             'hosts': self._get_related_agent_names(central_work, ['host']),
 
             # other relations:
-            'identifiers': [identifier_node['uri'] for identifier_node in central_work['identifiers']],
-            'tags': [tag_node['name'] for tag_node in central_work['tags']],
+            'identifiers': [
+                identifier_node['uri']
+                for identifier_node in central_work['identifiers']
+            ],
+            'tags': [
+                tag_node['name']
+                for tag_node in central_work['tags']
+            ],
             'subjects': self._get_subjects(central_work, source_name),
             'subject_synonyms': self._get_subject_synonyms(central_work),
 
-            # post-process:
-            'date': central_work['date_published'] or central_work['date_updated'] or normalized_datum.created_at.isoformat(),
-            #   'types': None,
-            #   'lists': None,
+            # a bunch of nested data because reasons -- used mostly for rendering search results
+            'lists': {
+                'affiliations': self._build_related_agent_list(central_work, ['agentworkrelation']),
+                'contributors': self._build_related_agent_list(central_work, [
+                    'contributor',
+                    'creator',
+                    'principalinvestigator',
+                    'principalinvestigatorcontact',
+                ]),
+                'funders': self._build_related_agent_list(central_work, ['funder']),
+                'publishers': self._build_related_agent_list(central_work, ['publisher']),
+                'hosts': self._build_related_agent_list(central_work, ['host']),
+                'lineage': self._build_work_lineage(central_work),
+            },
         }
 
     def _get_related_agent_names(self, work_node, relation_types):
@@ -86,3 +114,53 @@ class ShareV2ElasticFormatter(MetadataFormatter):
 
         subject_lineage.insert(0, taxonomy_name)
         return '|'.join(subject_lineage)
+
+    def _build_list_agent(self, relation_node):
+        agent_node = relation_node['agent']
+        return {
+            'type': agent_node.type,
+            'name': agent_node['name'],
+            'given_name': agent_node['given_name'],
+            'family_name': agent_node['family_name'],
+            'additional_name': agent_node['additional_name'],
+            'suffix': agent_node['suffix'],
+            'identifiers': [
+                identifier_node['uri']
+                for identifier_node in agent_node['identifiers']
+            ],
+            'relation_type': relation_node.type,
+            'order_cited': relation_node['order_cited'],
+            'cited_as': relation_node['cited_as'],
+        }
+
+    def _build_related_agent_list(self, work_node, relation_types):
+        return [
+            self._build_list_agent(relation_node)
+            for relation_node in work_node['agent_relations']
+            if relation_node.type in relation_types
+        ]
+
+    def _build_work_lineage(self, work_node):
+        try:
+            parent_work = next(
+                relation_node['related']
+                for relation_node in work_node['outgoing_creative_work_relations']
+                if relation_node.type == 'ispartof'
+            )
+        except StopIteration:
+            return ()
+
+        parent_lineage = self._build_work_lineage(parent_work)
+        parent_data = {
+            'type': parent_work.type,
+            'types': parent_work.schema_type.type_lineage,
+            'title': parent_work['title'],
+            'identifiers': [
+                identifier_node['uri']
+                for identifier_node in parent_work['identifiers']
+            ],
+        }
+        return (
+            *parent_lineage,
+            parent_data,
+        )
