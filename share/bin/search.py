@@ -41,12 +41,9 @@ def purge(args, argv):
 @search.subcommand('Create indicies and apply mappings')
 def setup(args, argv):
     """
-    Usage: {0} search setup [options]
-
-    Options:
-        -i, --index=INDEX    The name of the Elasticsearch index to use.
+    Usage: {0} search setup <index_name>
     """
-    ElasticManager().create_index(args.get('--index'))
+    ElasticManager().create_index(args['<index_name>'])
 
 
 @search.subcommand('Start the search indexing daemon')

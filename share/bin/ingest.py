@@ -5,7 +5,9 @@ from pprint import pprint
 from share.bin.util import command
 from share.ingest.scheduler import IngestScheduler
 from share.models import SourceConfig, RawDatum, SourceUniqueIdentifier
+from share.models.jobs import IngestJob
 from share.regulate import Regulator
+from share.tasks import ingest as ingest_task
 from share.util.osf import osf_sources
 
 
@@ -93,3 +95,33 @@ def ingest(args, argv):
     else:
         jobs = scheduler.bulk_reingest(qs)
         print('Scheduled {} IngestJobs'.format(len(jobs)))
+
+
+@command('Put IngestJobs back in the worker queue')
+def enqueue_ingest(args, argv):
+    """
+    Usage: {0} enqueue_ingest <job_ids>...
+           {0} enqueue_ingest --all-of-status <job_statuses>...
+
+    Options:
+        -s, --all-of-status   Enqueue and start tasks for all jobs of the given statuses (e.g. created, failed)
+    """
+    job_ids = args.get('<job_ids>')
+
+    if not job_ids:
+        job_statuses = args.get('<job_statuses>')
+        if not job_statuses:
+            return
+        status_values = [
+            getattr(IngestJob.STATUS, status_key)
+            for status_key in job_statuses
+        ]
+        job_ids = list(
+            IngestJob.objects.filter(status__in=status_values).values_list('id', flat=True)
+        )
+
+    print(f're-enqueuing {len(job_ids)} jobs...')
+    job_qs = IngestJob.objects.filter(id__in=job_ids)
+    job_qs.update(status=IngestJob.STATUS.created)
+    for job_id in job_ids:
+        ingest_task.delay(job_id=job_id)
