@@ -150,7 +150,7 @@ services:
 
   indexer:
     image: quay.io/centerforopenscience/share:develop
-    command: sharectl search daemon -l DEBUG
+    command: sharectl search daemon
     depends_on:
       - postgres
       - rabbitmq
