@@ -24,7 +24,7 @@ class Extensions:
     @classmethod
     def get(cls, namespace, name):
         try:
-            return cls._get_manager(name).plugin
+            return cls._get_manager(namespace)[name].plugin
         except Exception as exc:
             raise ExtensionsError(f'Error loading extension ("{namespace}", "{name}")') from exc
 

@@ -13,10 +13,11 @@ class ShareV2ElasticFormatter(MetadataFormatter):
         if central_work.concrete_type != 'abstractcreativework':
             return
 
-        source_name = normalized_datum.suid.source_config.source.long_title
+        suid = normalized_datum.raw.suid
+        source_name = suid.source_config.source.long_title
 
         return {
-            'id': normalized_datum.suid.id,
+            'id': suid.id,
             'sources': [source_name],
 
             # attributes:
