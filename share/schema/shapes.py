@@ -29,6 +29,8 @@ class ShareV2SchemaRelation(NamedTuple):
     related_concrete_type: str
     inverse_relation: str
     through_concrete_type: Optional[str] = None
+    incoming_through_relation: Optional[str] = None
+    outgoing_through_relation: Optional[str] = None
     is_required: bool = False
     is_implicit: bool = False
     is_relation: bool = True

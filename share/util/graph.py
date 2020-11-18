@@ -66,8 +66,8 @@ class MutableGraph(nx.DiGraph):
         """Create a mutable graph from a list of JSON-LD-style dicts.
         """
         if isinstance(nodes, dict):
-            nodes = nodes['@graph']
             central_node_id = nodes.get('central_node_id', None)
+            nodes = nodes['@graph']
         graph = cls()
         if central_node_id:
             graph.central_node_id = central_node_id
@@ -425,8 +425,18 @@ class MutableNode:
                 return self.graph.resolve_named_out_edge(self.id, field.name)
             if field.relation_shape == RelationShape.ONE_TO_MANY:
                 return self.graph.resolve_named_in_edges(self.id, field.name)
-            raise MutableGraphError('Only many-to-one and one-to-many relations allowed')
+            if field.relation_shape == RelationShape.MANY_TO_MANY:
+                return self._resolve_many_to_many(field)
+            raise MutableGraphError('Only many-to-one, one-to-many, and many-to-many relations allowed')
         return self.__attrs.get(field.name if field else key)
+
+    def _resolve_many_to_many(self, field):
+        incoming_edge_name = ShareV2Schema().get_field(field.through_concrete_type, field.incoming_through_relation).inverse_relation
+        through_nodes = self.graph.resolve_named_in_edges(self.id, incoming_edge_name)
+        return [
+            self.graph.resolve_named_out_edge(through_node.id, field.outgoing_through_relation)
+            for through_node in through_nodes
+        ]
 
     def __setitem__(self, key, value):
         """Set an attribute value or add an outgoing named edge.
