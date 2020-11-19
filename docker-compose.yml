@@ -107,7 +107,7 @@ services:
       - share_requirements_vol:/python3.6
 
   frontend:
-    image: quay.io/centerforopenscience/ember-share:develop-staging
+    image: quay.io/centerforopenscience/share-web:develop-local
     command: yarn start
     ports:
       - 4204:4200
