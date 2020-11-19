@@ -275,7 +275,7 @@ class OutgoingActionLoop:
             if not ok and not (op_type == 'delete' and response['status'] == 404):
                 raise DaemonIndexingError(ok, response)
 
-            message = self.messages_awaiting_elastic.pop(response['_id'])
+            message = self.messages_awaiting_elastic.pop(str(response['_id']))
             message.ack()
 
         time_elapsed = time.time() - start_time
@@ -297,7 +297,7 @@ class OutgoingActionLoop:
                 if action['_id'] in self.messages_awaiting_elastic:
                     # should have been deduped in IncomingMessageLoop
                     raise DaemonMessageError('duplicate messages in one chunk -- should not happen')
-                self.messages_awaiting_elastic[action['_id']] = message
+                self.messages_awaiting_elastic[str(action['_id'])] = message
                 yield action
             except local_queue.Empty:
                 raise StopIteration

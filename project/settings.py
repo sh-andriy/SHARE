@@ -298,7 +298,7 @@ STATICFILES_FINDERS = (
 ELASTICSEARCH = {
     'SNIFF': bool(os.environ.get('ELASTICSEARCH_SNIFF')),
     'URL': os.environ.get('ELASTICSEARCH_URL', 'http://localhost:9200/'),
-    'INDEX': os.environ.get('ELASTIC_SEARCH_INDEX', 'share'),
+    'INDEX': os.environ.get('ELASTIC_SEARCH_INDEX', 'share_postrend_backcompat'),
     'TIMEOUT': int(os.environ.get('ELASTICSEARCH_TIMEOUT', '45')),
     'INDEX_VERSIONS': split(os.environ.get('ELASTICSEARCH_INDEX_VERSIONS', ''), ','),
     'CHUNK_SIZE': int(os.environ.get('ELASTICSEARCH_CHUNK_SIZE', 25)),
@@ -308,7 +308,7 @@ ELASTICSEARCH = {
         'no_ack': False,  # WHY KOMBU THAT'S NOT HOW ENGLISH WORKS
     },
     # NOTE: mappings will have to be created BEFORE the daemon starts
-    'ACTIVE_INDEXES': split(os.environ.get('ELASTICSEARCH_ACTIVE_INDEXES', 'share_customtax_1,share_v3'), ','),
+    'ACTIVE_INDEXES': split(os.environ.get('ELASTICSEARCH_ACTIVE_INDEXES', 'share_customtax_1,share_v3,share_postrend_backcompat'), ','),
     'INDEXES': {
         'share_v3': {
             'DEFAULT_QUEUE': 'es-triton-share',
@@ -320,9 +320,9 @@ ELASTICSEARCH = {
             'URGENT_QUEUE': 'es-share.urgent',
             'INDEX_SETUP': 'share_classic',
         },
-        'share_v5': {
-            'DEFAULT_QUEUE': 'es-share-v5',
-            'URGENT_QUEUE': 'es-share-v5.urgent',
+        'share_postrend_backcompat': {
+            'DEFAULT_QUEUE': 'es-share-postrend-backcompat',
+            'URGENT_QUEUE': 'es-share-postrend-backcompat.urgent',
             'INDEX_SETUP': 'postrend_backcompat',
         },
         # 'share_v6': {

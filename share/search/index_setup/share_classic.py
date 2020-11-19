@@ -30,9 +30,6 @@ class ShareClassicIndexSetup(IndexSetup):
     def index_mappings(self):
         return self.backcompat_setup.index_mappings
 
-    def build_and_cache_source_doc(self, message_type, target_id):
-        pass  # the classic setup does not cache
-
     def build_action_generator(self, index_name, message_type):
         if message_type not in self.supported_message_types:
             raise IndexSetupError(f'Invalid message_type "{message_type}" (expected {self.supported_message_types})')

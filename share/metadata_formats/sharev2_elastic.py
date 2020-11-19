@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 
 from share.util.graph import MutableGraph
@@ -10,13 +12,13 @@ class ShareV2ElasticFormatter(MetadataFormatter):
         mgraph = MutableGraph.from_jsonld(normalized_datum.data)
         central_work = mgraph.get_central_node(guess=True)
 
-        if central_work.concrete_type != 'abstractcreativework':
-            return
+        if not central_work or central_work.concrete_type != 'abstractcreativework':
+            return None
 
         suid = normalized_datum.raw.suid
         source_name = suid.source_config.source.long_title
 
-        return {
+        return json.dumps({
             'id': suid.id,
             'sources': [source_name],
 
@@ -79,7 +81,7 @@ class ShareV2ElasticFormatter(MetadataFormatter):
                 'hosts': self._build_related_agent_list(central_work, ['host']),
                 'lineage': self._build_work_lineage(central_work),
             },
-        }
+        })
 
     def _get_related_agent_names(self, work_node, relation_types):
         return [

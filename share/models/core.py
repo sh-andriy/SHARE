@@ -211,13 +211,16 @@ class FormattedMetadataRecordManager(models.Manager):
             normalized_data = NormalizedData.objects.filter(raw__suid=suid).order_by('-created_at').first()
 
         formatted_metadata = formatter.format(normalized_data)
-        record, _ = self.update_or_create(
-            suid=suid,
-            record_format=record_format,
-            defaults={
-                'formatted_metadata': formatted_metadata,
-            },
-        )
+        if formatted_metadata:
+            record, _ = self.update_or_create(
+                suid=suid,
+                record_format=record_format,
+                defaults={
+                    'formatted_metadata': formatted_metadata,
+                },
+            )
+        else:
+            record = None
         return record
 
     def get_or_create_formatted_metadata_record(self, suid, record_format):

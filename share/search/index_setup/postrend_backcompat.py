@@ -1,3 +1,5 @@
+import json
+
 from share.models.core import FormattedMetadataRecord
 from share.search.index_setup.base import IndexSetup
 from share.search.messages import MessageType
@@ -156,7 +158,7 @@ class PostRendBackcompatIndexSetup(IndexSetup):
 
         action_template = {
             '_index': index_name,
-            '_type': self.get_es_doc_type(message_type),
+            '_type': 'creativeworks',
         }
 
         def action_generator(target_id_iter):
@@ -165,7 +167,7 @@ class PostRendBackcompatIndexSetup(IndexSetup):
                 record_format='sharev2_elastic',  # TODO specify in config? or don't
             )
             for record in record_qs:
-                source_doc = record.formatted_metadata
+                source_doc = json.loads(record.formatted_metadata)
                 if source_doc.pop('is_deleted', False):
                     action = {
                         **action_template,
