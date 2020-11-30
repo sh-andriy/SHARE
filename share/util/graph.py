@@ -65,6 +65,7 @@ class MutableGraph(nx.DiGraph):
     def from_jsonld(cls, nodes):
         """Create a mutable graph from a list of JSON-LD-style dicts.
         """
+        central_node_id = None
         if isinstance(nodes, dict):
             central_node_id = nodes.get('central_node_id', None)
             nodes = nodes['@graph']

@@ -35,7 +35,7 @@ def test_get_guid_from_uri(uri, expected):
     (f.Agent(id='a'), None),
 ])
 def test_get_central_work(ExpectedGraph, graph_input, expected_node_id):
-    actual = ExpectedGraph(graph_input).get_central_node()
+    actual = ExpectedGraph(graph_input).get_central_node(guess=True)
     if expected_node_id is None:
         assert actual is None
     else:

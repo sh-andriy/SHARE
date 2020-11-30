@@ -80,9 +80,8 @@ class SchemaLoader:
         self.schema_types[type_name.lower()] = ShareV2SchemaType(
             name=type_name,
             concrete_type=concrete_type,
-            type_lineage=type_lineage,
-            distance_from_concrete_type=len(type_lineage),
             explicit_fields=set(self.explicit_field_names.get(concrete_type, [])),
+            type_lineage=type_lineage,
         )
 
     def _add_type_tree(self, concrete_type, type_tree, parent_type_lineage=()):
@@ -164,11 +163,11 @@ class SchemaLoader:
             'incoming_through_relation',
             'outgoing_through_relation',
         }
-        present_m2m_attrs = [
+        present_m2m_attrs = {
             attr_name
             for attr_name in required_m2m_attrs
             if getattr(new_relation, attr_name)
-        ]
+        }
         if present_m2m_attrs and new_relation.relation_shape != RelationShape.MANY_TO_MANY:
             raise SchemaLoadError(f'{present_m2m_attrs} set on non-m2m relation {new_relation}')
         if new_relation.relation_shape == RelationShape.MANY_TO_MANY and len(present_m2m_attrs) != len(required_m2m_attrs):

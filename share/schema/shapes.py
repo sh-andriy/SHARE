@@ -10,9 +10,12 @@ AttributeDataFormat = Enum('AttributeDataFormat', ['URI'])
 class ShareV2SchemaType(NamedTuple):
     name: str
     concrete_type: str
-    type_lineage: Tuple[str]
     explicit_fields: Set[str]
-    distance_from_concrete_type: int = 0
+    type_lineage: Tuple[str] = ()
+
+    @property
+    def distance_from_concrete_type(self):
+        return len(self.type_lineage)
 
 
 class ShareV2SchemaAttribute(NamedTuple):
