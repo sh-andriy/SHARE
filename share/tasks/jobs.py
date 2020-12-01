@@ -330,17 +330,16 @@ class IngestJobConsumer(JobConsumer):
         else:
             graph = MutableGraph.from_jsonld(datum.data)
 
-        self._save_formatted_metadata(job.suid, datum)
-
         if apply_changes:
+            # new Suid-based process
+            self._save_formatted_metadata(job.suid, datum)
+            if index:
+                self._queue_for_indexing(job.suid, urgent)
+
             # soon-to-be-rended ShareObject-based process:
             updated_work_ids = self._apply_changes(job, graph, datum)
             if index and updated_work_ids:
                 self._update_index(updated_work_ids, urgent)
-
-        # new Suid-based process
-        if index:
-            self._queue_for_indexing(job.suid, urgent)
 
     def _transform(self, job):
         transformer = job.suid.source_config.get_transformer()
