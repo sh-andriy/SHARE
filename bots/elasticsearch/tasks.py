@@ -23,7 +23,7 @@ def index_sources(self, es_index=None, es_url=None, timeout=None):
     errors = []
     es_client = Elasticsearch(es_url or settings.ELASTICSEARCH['URL'], retry_on_timeout=True, timeout=settings.ELASTICSEARCH['TIMEOUT'])
 
-    for ok, resp in helpers.streaming_bulk(es_client, SourceBulkStreamHelper(es_index or settings.ELASTICSEARCH['INDEX']), raise_on_error=False):
+    for ok, resp in helpers.streaming_bulk(es_client, SourceBulkStreamHelper(es_index or settings.ELASTICSEARCH['PRIMARY_INDEX']), raise_on_error=False):
         if not ok:
             logger.warning(resp)
         else:

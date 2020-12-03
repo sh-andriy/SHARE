@@ -154,5 +154,5 @@ class TestElasticSearchProxy:
         with mock.patch('api.search.views.requests.get') as get:
             get.return_value = mock.Mock(status_code=200, json=lambda: {})
             client.get('/api/v2/search/_search')
-            elastic_url = furl('{}{}/{}'.format(settings.ELASTICSEARCH['URL'], settings.ELASTICSEARCH['INDEX'], '_search'))
+            elastic_url = furl('{}{}/{}'.format(settings.ELASTICSEARCH['URL'], settings.ELASTICSEARCH['PRIMARY_INDEX'], '_search'))
             get.assert_called_with(elastic_url)

@@ -298,7 +298,7 @@ STATICFILES_FINDERS = (
 ELASTICSEARCH = {
     'SNIFF': bool(os.environ.get('ELASTICSEARCH_SNIFF')),
     'URL': os.environ.get('ELASTICSEARCH_URL', 'http://localhost:9200/'),
-    'INDEX': os.environ.get('ELASTIC_SEARCH_INDEX', 'share_postrend_backcompat'),
+    'PRIMARY_INDEX': os.environ.get('ELASTICSEARCH_PRIMARY_INDEX', 'share'),
     'TIMEOUT': int(os.environ.get('ELASTICSEARCH_TIMEOUT', '45')),
     'INDEX_VERSIONS': split(os.environ.get('ELASTICSEARCH_INDEX_VERSIONS', ''), ','),
     'CHUNK_SIZE': int(os.environ.get('ELASTICSEARCH_CHUNK_SIZE', 25)),

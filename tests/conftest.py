@@ -238,7 +238,7 @@ def elastic_test_manager(settings, elastic_test_index_name):
     settings.ELASTICSEARCH = {
         **settings.ELASTICSEARCH,
         'TIMEOUT': 5,
-        'INDEX': elastic_test_index_name,
+        'PRIMARY_INDEX': elastic_test_index_name,
         'ACTIVE_INDEXES': [elastic_test_index_name],
         'INDEXES': {
             elastic_test_index_name: {
