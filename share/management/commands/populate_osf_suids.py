@@ -62,10 +62,9 @@ class Command(BaseShareCommand):
 
         nd_iterator = nd_qs.iterator()
 
-        # TODO move rollback inside the loop -- one transaction per record (or chunk?), not one crazy long one
-        with self.rollback_unless_commit(commit=commit):
-            for nd in nd_iterator:
-                mgraph = MutableGraph.from_jsonld(nd.data)
-                guid = guess_osf_guid(mgraph)
-                if guid:
+        for nd in nd_iterator:
+            mgraph = MutableGraph.from_jsonld(nd.data)
+            guid = guess_osf_guid(mgraph)
+            if guid:
+                with self.rollback_unless_commit(commit=commit):
                     update_suid(nd, guid)
