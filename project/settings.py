@@ -307,8 +307,9 @@ ELASTICSEARCH = {
         'compression': 'zlib',
         'no_ack': False,  # WHY KOMBU THAT'S NOT HOW ENGLISH WORKS
     },
-    # NOTE: mappings will have to be created BEFORE the daemon starts
-    'ACTIVE_INDEXES': split(os.environ.get('ELASTICSEARCH_ACTIVE_INDEXES', 'share_customtax_1,share_v3,share_postrend_backcompat'), ','),
+    # NOTE: "active" indexes will receive new records from the indexer daemon -- be sure they're set up first
+    'ACTIVE_INDEXES': split(os.environ.get('ELASTICSEARCH_ACTIVE_INDEXES', 'share_customtax_1'), ','),
+    # NOTE: indexes here won't be created automatically -- run `sharectl search setup <index_name>` BEFORE the daemon starts
     'INDEXES': {
         'share_v3': {
             'DEFAULT_QUEUE': 'es-triton-share',
@@ -325,9 +326,9 @@ ELASTICSEARCH = {
             'URGENT_QUEUE': 'es-share-postrend-backcompat.urgent',
             'INDEX_SETUP': 'postrend_backcompat',
         },
-        # 'share_v6': {
-        #     'DEFAULT_QUEUE': 'es-share-v5',
-        #     'URGENT_QUEUE': 'es-share-v5.urgent',
+        # 'trove_v0': {
+        #     'DEFAULT_QUEUE': 'es-trove-v0',
+        #     'URGENT_QUEUE': 'es-trove-v0.urgent',
         #     'INDEX_SETUP': 'trove_v0',
         # },
     },
