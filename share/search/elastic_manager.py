@@ -39,7 +39,6 @@ class ElasticManager:
     def create_index(self, index_name):
         index_setup = self.get_index_setup(index_name)
 
-        # TODO think about this
         logger.debug('Ensuring Elasticsearch index %s', index_name)
         self.es_client.indices.create(index_name, ignore=400)
 

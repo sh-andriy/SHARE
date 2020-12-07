@@ -489,11 +489,6 @@ LOGGING = {
             'level': LOG_LEVEL,
             'propagate': False
         },
-        'share.search.daemon': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False
-        },
         'django.db.backends': {
             'level': 'ERROR',
             'handlers': ['console'],

@@ -64,7 +64,7 @@ before_script:
 # Run Python tests and flake8
 script:
     - flake8 .
-    - py.test tests --cov=share --cov=api
+    - pytest tests --cov=share --cov=api
     - coverage run --append --source=share,api -m behave
 
 after_success:

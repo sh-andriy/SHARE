@@ -1,4 +1,3 @@
-import logging
 import threading
 
 from project.celery import app as celery_app
@@ -49,15 +48,8 @@ def setup(args, argv):
 @search.subcommand('Start the search indexing daemon')
 def daemon(args, argv):
     """
-    Usage: {0} search daemon [options]
-
-    Options:
-        -l, --log-level=LOGLEVEL  Set the log level [default: INFO]
+    Usage: {0} search daemon
     """
-    # TODO consolidate loggers? or at least make sure this is catching all the relevant ones
-    logging.getLogger('share.search.daemon').setLevel(args['--log-level'])
-    logging.getLogger('share.search.messages').setLevel(args['--log-level'])
-
     elastic_manager = ElasticManager()
     stop_event = threading.Event()
     for index_name in settings.ELASTICSEARCH['ACTIVE_INDEXES']:

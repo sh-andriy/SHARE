@@ -24,7 +24,6 @@ from share.regulate import Regulator
 from share.search import SearchIndexer
 from share.search.messages import MessageType
 from share.util import chunked
-from share.util.extensions import Extensions
 from share.util.graph import MutableGraph
 
 
@@ -368,12 +367,7 @@ class IngestJobConsumer(JobConsumer):
             return None
 
     def _save_formatted_metadata(self, suid, normalized_datum):
-        for format_name in Extensions.get_names('share.metadata_formats'):
-            FormattedMetadataRecord.objects.update_or_create_formatted_metadata_record(
-                suid,
-                format_name,
-                normalized_datum,
-            )
+        FormattedMetadataRecord.objects.update_or_create_all_metadata_formats(suid, normalized_datum)
 
     def _queue_for_indexing(self, suid, urgent):
         indexer = SearchIndexer(self.task.app) if self.task else SearchIndexer()
